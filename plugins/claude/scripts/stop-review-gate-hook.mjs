@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { getCodexAvailability } from "./lib/codex.mjs";
+import { getClaudeAvailability } from "./lib/claude.mjs";
 import { loadPromptTemplate, interpolateTemplate } from "./lib/prompts.mjs";
 import { getConfig, listJobs } from "./lib/state.mjs";
 import { sortJobsNewestFirst } from "./lib/job-control.mjs";
@@ -16,14 +16,10 @@ import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 const STOP_REVIEW_TIMEOUT_MS = 15 * 60 * 1000;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "..");
-const STOP_REVIEW_TASK_MARKER = "Run a stop-gate review of the previous Claude turn.";
 
 function readHookInput() {
   const raw = fs.readFileSync(0, "utf8").trim();
-  if (!raw) {
-    return {};
-  }
-  return JSON.parse(raw);
+  return raw ? JSON.parse(raw) : {};
 }
 
 function emitDecision(payload) {
@@ -31,39 +27,34 @@ function emitDecision(payload) {
 }
 
 function logNote(message) {
-  if (!message) {
-    return;
+  if (message) {
+    process.stderr.write(`${message}\n`);
   }
-  process.stderr.write(`${message}\n`);
 }
 
 function filterJobsForCurrentSession(jobs, input = {}) {
   const sessionId = input.session_id || process.env[SESSION_ID_ENV] || null;
-  if (!sessionId) {
-    return jobs;
-  }
-  return jobs.filter((job) => job.sessionId === sessionId);
+  return sessionId ? jobs.filter((job) => job.sessionId === sessionId) : jobs;
 }
 
 function buildStopReviewPrompt(input = {}) {
   const lastAssistantMessage = String(input.last_assistant_message ?? "").trim();
   const template = loadPromptTemplate(ROOT_DIR, "stop-review-gate");
-  const claudeResponseBlock = lastAssistantMessage
-    ? ["Previous Claude response:", lastAssistantMessage].join("\n")
+  const previousCodexResponseBlock = lastAssistantMessage
+    ? ["Previous Codex response:", lastAssistantMessage].join("\n")
     : "";
   return interpolateTemplate(template, {
-    CLAUDE_RESPONSE_BLOCK: claudeResponseBlock
+    CLAUDE_RESPONSE_BLOCK: previousCodexResponseBlock
   });
 }
 
 function buildSetupNote(cwd) {
-  const availability = getCodexAvailability(cwd);
+  const availability = getClaudeAvailability(cwd);
   if (availability.available) {
     return null;
   }
-
   const detail = availability.detail ? ` ${availability.detail}.` : "";
-  return `Codex is not set up for the review gate.${detail} Run /codex:setup.`;
+  return `Claude Code is not set up for the review gate.${detail} Run claude-setup.`;
 }
 
 function parseStopReviewOutput(rawOutput) {
@@ -71,8 +62,7 @@ function parseStopReviewOutput(rawOutput) {
   if (!text) {
     return {
       ok: false,
-      reason:
-        "The stop-time Codex review task returned no final output. Run /codex:review --wait manually or bypass the gate."
+      reason: "The stop-time Claude review task returned no final output. Run claude-review manually or bypass the gate."
     };
   }
 
@@ -84,19 +74,18 @@ function parseStopReviewOutput(rawOutput) {
     const reason = firstLine.slice("BLOCK:".length).trim() || text;
     return {
       ok: false,
-      reason: `Codex stop-time review found issues that still need fixes before ending the session: ${reason}`
+      reason: `Claude stop-time review found issues that still need fixes before ending the session: ${reason}`
     };
   }
 
   return {
     ok: false,
-    reason:
-      "The stop-time Codex review task returned an unexpected answer. Run /codex:review --wait manually or bypass the gate."
+    reason: "The stop-time Claude review task returned an unexpected answer. Run claude-review manually or bypass the gate."
   };
 }
 
 function runStopReview(cwd, input = {}) {
-  const scriptPath = path.join(SCRIPT_DIR, "codex-companion.mjs");
+  const scriptPath = path.join(SCRIPT_DIR, "claude-companion.mjs");
   const prompt = buildStopReviewPrompt(input);
   const childEnv = {
     ...process.env,
@@ -112,8 +101,7 @@ function runStopReview(cwd, input = {}) {
   if (result.error?.code === "ETIMEDOUT") {
     return {
       ok: false,
-      reason:
-        "The stop-time Codex review task timed out after 15 minutes. Run /codex:review --wait manually or bypass the gate."
+      reason: "The stop-time Claude review task timed out after 15 minutes. Run claude-review manually or bypass the gate."
     };
   }
 
@@ -121,9 +109,7 @@ function runStopReview(cwd, input = {}) {
     const detail = String(result.stderr || result.stdout || "").trim();
     return {
       ok: false,
-      reason: detail
-        ? `The stop-time Codex review task failed: ${detail}`
-        : "The stop-time Codex review task failed. Run /codex:review --wait manually or bypass the gate."
+      reason: detail ? `The stop-time Claude review task failed: ${detail}` : "The stop-time Claude review task failed."
     };
   }
 
@@ -133,22 +119,21 @@ function runStopReview(cwd, input = {}) {
   } catch {
     return {
       ok: false,
-      reason:
-        "The stop-time Codex review task returned invalid JSON. Run /codex:review --wait manually or bypass the gate."
+      reason: "The stop-time Claude review task returned invalid JSON. Run claude-review manually or bypass the gate."
     };
   }
 }
 
 function main() {
   const input = readHookInput();
-  const cwd = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const cwd = input.cwd || process.env.CODEX_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const config = getConfig(workspaceRoot);
 
   const jobs = sortJobsNewestFirst(filterJobsForCurrentSession(listJobs(workspaceRoot), input));
   const runningJob = jobs.find((job) => job.status === "queued" || job.status === "running");
   const runningTaskNote = runningJob
-    ? `Codex task ${runningJob.id} is still running. Check /codex:status and use /codex:cancel ${runningJob.id} if you want to stop it before ending the session.`
+    ? `Claude task ${runningJob.id} is still running. Check claude-status and use claude-cancel ${runningJob.id} if you want to stop it before ending the session.`
     : null;
 
   if (!config.stopReviewGate) {
@@ -178,7 +163,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
 }

@@ -1,12 +1,12 @@
 {
-  "description": "Optional stop-time review gate for Codex Companion.",
+  "description": "Optional stop-time review gate for Claude Companion.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionStart",
+            "command": "node \"${CODEX_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionStart",
             "timeout": 5
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionEnd",
+            "command": "node \"${CODEX_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionEnd",
             "timeout": 5
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop-review-gate-hook.mjs\"",
+            "command": "node \"${CODEX_PLUGIN_ROOT}/scripts/stop-review-gate-hook.mjs\"",
             "timeout": 900
           }
         ]

@@ -16,11 +16,11 @@ test("resolveStateDir uses a temp-backed per-workspace directory", () => {
   assert.match(stateDir, new RegExp(`^${os.tmpdir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
 });
 
-test("resolveStateDir uses CLAUDE_PLUGIN_DATA when it is provided", () => {
+test("resolveStateDir uses CODEX_PLUGIN_DATA when it is provided", () => {
   const workspace = makeTempDir();
   const pluginDataDir = makeTempDir();
-  const previousPluginDataDir = process.env.CLAUDE_PLUGIN_DATA;
-  process.env.CLAUDE_PLUGIN_DATA = pluginDataDir;
+  const previousPluginDataDir = process.env.CODEX_PLUGIN_DATA;
+  process.env.CODEX_PLUGIN_DATA = pluginDataDir;
 
   try {
     const stateDir = resolveStateDir(workspace);
@@ -33,9 +33,35 @@ test("resolveStateDir uses CLAUDE_PLUGIN_DATA when it is provided", () => {
     );
   } finally {
     if (previousPluginDataDir == null) {
+      delete process.env.CODEX_PLUGIN_DATA;
+    } else {
+      process.env.CODEX_PLUGIN_DATA = previousPluginDataDir;
+    }
+  }
+});
+
+test("resolveStateDir still honors legacy CLAUDE_PLUGIN_DATA", () => {
+  const workspace = makeTempDir();
+  const pluginDataDir = makeTempDir();
+  const previousCodexPluginDataDir = process.env.CODEX_PLUGIN_DATA;
+  const previousClaudePluginDataDir = process.env.CLAUDE_PLUGIN_DATA;
+  delete process.env.CODEX_PLUGIN_DATA;
+  process.env.CLAUDE_PLUGIN_DATA = pluginDataDir;
+
+  try {
+    const stateDir = resolveStateDir(workspace);
+
+    assert.equal(stateDir.startsWith(path.join(pluginDataDir, "state")), true);
+  } finally {
+    if (previousCodexPluginDataDir == null) {
+      delete process.env.CODEX_PLUGIN_DATA;
+    } else {
+      process.env.CODEX_PLUGIN_DATA = previousCodexPluginDataDir;
+    }
+    if (previousClaudePluginDataDir == null) {
       delete process.env.CLAUDE_PLUGIN_DATA;
     } else {
-      process.env.CLAUDE_PLUGIN_DATA = previousPluginDataDir;
+      process.env.CLAUDE_PLUGIN_DATA = previousClaudePluginDataDir;
     }
   }
 });

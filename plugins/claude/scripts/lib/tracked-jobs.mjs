@@ -3,7 +3,7 @@ import process from "node:process";
 
 import { readJobFile, resolveJobFile, resolveJobLogFile, upsertJob, writeJobFile } from "./state.mjs";
 
-export const SESSION_ID_ENV = "CODEX_COMPANION_SESSION_ID";
+export const SESSION_ID_ENV = "CLAUDE_COMPANION_SESSION_ID";
 
 export function nowIso() {
   return new Date().toISOString();

@@ -84,7 +84,8 @@ test("task can run foreground and stores result for status/result", () => {
   installFakeClaude(binDir);
   const repo = makeRepo();
   const env = buildEnv(binDir, {
-    CLAUDE_PLUGIN_DATA: makeTempDir("claude-plugin-data-")
+    CODEX_PLUGIN_DATA: makeTempDir("claude-plugin-data-"),
+    CLAUDE_COMPANION_SESSION_ID: "session-123"
   });
 
   const task = runCompanion(["task", "--json", "--cwd", repo, "inspect this repo"], {
@@ -99,6 +100,7 @@ test("task can run foreground and stores result for status/result", () => {
   assert.equal(status.status, 0, status.stderr);
   const statusPayload = JSON.parse(status.stdout);
   assert.equal(statusPayload.latestFinished.status, "completed");
+  assert.equal(statusPayload.latestFinished.sessionId, "session-123");
 
   const result = runCompanion(["result", "--json", "--cwd", repo], { cwd: repo, env });
   assert.equal(result.status, 0, result.stderr);
@@ -112,7 +114,7 @@ test("background task can be cancelled", () => {
   installFakeClaude(binDir, "slow");
   const repo = makeRepo();
   const env = buildEnv(binDir, {
-    CLAUDE_PLUGIN_DATA: makeTempDir("claude-plugin-data-")
+    CODEX_PLUGIN_DATA: makeTempDir("claude-plugin-data-")
   });
 
   const task = runCompanion(["task", "--json", "--background", "--cwd", repo, "inspect slowly"], {

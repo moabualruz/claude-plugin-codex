@@ -1,5 +1,5 @@
 # Changelog
 
-## 1.0.0
+## 1.0.4
 
-- Initial version of the Codex plugin for Claude Code
+- Initial Claude Code plugin for Codex conversion.
