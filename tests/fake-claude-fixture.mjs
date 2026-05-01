@@ -59,25 +59,33 @@ if (BEHAVIOR === "auth-run-fails") {
   process.exit(1);
 }
 
-const prompt = promptFromArgs(args);
-const outputFormatIndex = args.indexOf("--output-format");
-const outputFormat = outputFormatIndex >= 0 ? args[outputFormatIndex + 1] : "text";
-const wantsStructured = /json|structured|schema|adversarial/i.test(prompt);
-const text = wantsStructured
-  ? JSON.stringify({ verdict: "approve", summary: "No material issues found.", findings: [], next_steps: [] })
-  : "No material issues found.";
+function runPrompt() {
+  const prompt = promptFromArgs(args);
+  const outputFormatIndex = args.indexOf("--output-format");
+  const outputFormat = outputFormatIndex >= 0 ? args[outputFormatIndex + 1] : "text";
+  const wantsStructured = /json|structured|schema|adversarial/i.test(prompt);
+  const text = wantsStructured
+    ? JSON.stringify({ verdict: "approve", summary: "No material issues found.", findings: [], next_steps: [] })
+    : "No material issues found.";
 
-if (outputFormat === "stream-json") {
-  writeJson({ type: "system", subtype: "init", session_id: "fake-session-1" });
-  writeJson({ type: "assistant", message: { content: [{ type: "text", text }] } });
-  writeJson({ type: "result", subtype: "success", session_id: "fake-session-1", result: text });
-  writeJson({ type: "summary", summary: "Inspected the requested prompt." });
-  writeJson({ type: "tool_result", name: "Edit", file_path: "src/app.js" });
+  if (outputFormat === "stream-json") {
+    writeJson({ type: "system", subtype: "init", session_id: "fake-session-1" });
+    writeJson({ type: "assistant", message: { content: [{ type: "text", text }] } });
+    writeJson({ type: "result", subtype: "success", session_id: "fake-session-1", result: text });
+    writeJson({ type: "summary", summary: "Inspected the requested prompt." });
+    writeJson({ type: "tool_result", name: "Edit", file_path: "src/app.js" });
+    process.exit(0);
+  }
+
+  console.log(text);
   process.exit(0);
 }
 
-console.log(text);
-process.exit(0);
+if (BEHAVIOR === "slow") {
+  setTimeout(runPrompt, 5000);
+} else {
+  runPrompt();
+}
 `;
   writeExecutable(scriptPath, source);
 }
