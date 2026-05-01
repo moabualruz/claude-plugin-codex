@@ -6,6 +6,8 @@ Fork `openai/codex-plugin-cc` into a Codex plugin that lets Codex run Claude Cod
 
 The fork should become `claude-plugin-codex`: a Codex plugin named `claude` that supports setup, review, adversarial review, delegated tasks, background job status, result retrieval, cancellation, and an optional review gate where Codex plugin hooks can support it.
 
+Implementation should be conversion-first. Start from the cloned upstream repository, keep every reusable runtime helper and test pattern, and edit the existing plugin into the reverse product. Do not scaffold a new plugin from scratch unless a file has no useful upstream equivalent.
+
 Full parity means workflow parity, not identical internals. The upstream plugin uses Codex app-server APIs. Claude Code does not expose the same app-server protocol, so the reverse plugin will use Claude Code's CLI surfaces and stream output parsing.
 
 ## User-Facing Parity
@@ -25,17 +27,17 @@ Codex currently does not expose Claude-style slash commands in the local CLI sur
 
 ## Repository Shape
 
-The fork keeps the upstream testable Node runtime pattern but renames the product boundary:
+The fork keeps the upstream testable Node runtime pattern and converts files in place:
 
-- `.agents/plugins/marketplace.json`: Codex marketplace entry.
-- `plugins/claude/.codex-plugin/plugin.json`: Codex plugin manifest.
-- `plugins/claude/scripts/claude-companion.mjs`: main runtime entrypoint.
-- `plugins/claude/scripts/lib/*.mjs`: ported runtime helpers.
-- `plugins/claude/skills/*/SKILL.md`: Codex-facing command wrappers.
-- `plugins/claude/hooks/hooks.json`: optional hook registration if local Codex plugin hooks are sufficient.
-- `tests/*.test.mjs`: renamed and adjusted tests preserving upstream behavioral coverage.
+- `.claude-plugin/marketplace.json` becomes `.agents/plugins/marketplace.json`.
+- `plugins/codex/.claude-plugin/plugin.json` becomes `plugins/claude/.codex-plugin/plugin.json`.
+- `plugins/codex/scripts/codex-companion.mjs` becomes `plugins/claude/scripts/claude-companion.mjs`.
+- `plugins/codex/scripts/lib/*.mjs` are renamed or adapted only where Codex-specific app-server behavior must become Claude CLI behavior.
+- `plugins/codex/commands/*` and `plugins/codex/agents/*` become Codex-facing skills under `plugins/claude/skills/*/SKILL.md`.
+- `plugins/codex/hooks/hooks.json` becomes `plugins/claude/hooks/hooks.json` if local Codex plugin hooks are sufficient.
+- `tests/*.test.mjs` are renamed and adjusted while preserving upstream behavioral coverage.
 
-Upstream `.claude-plugin` metadata, Claude slash-command files, and Claude agents should be removed or replaced with Codex plugin equivalents.
+Upstream files should be deleted only after their behavior has a Codex-plugin replacement or is proven inapplicable. This keeps the port auditable and reduces parity gaps.
 
 ## Runtime Architecture
 
