@@ -1,8 +1,25 @@
 {
-  "name": "codex",
+  "name": "claude",
   "version": "1.0.4",
-  "description": "Use Codex from Claude Code to review code or delegate tasks.",
+  "description": "Use Claude Code from Codex to review code or delegate tasks.",
   "author": {
     "name": "OpenAI"
+  },
+  "license": "Apache-2.0",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Claude Code",
+    "shortDescription": "Run Claude Code from Codex.",
+    "longDescription": "Review code, delegate tasks, and manage background Claude Code runs from Codex.",
+    "developerName": "OpenAI",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Ask Claude to review my changes.",
+      "Ask Claude to investigate this bug.",
+      "Show Claude task status."
+    ],
+    "brandColor": "#D97757"
   }
 }

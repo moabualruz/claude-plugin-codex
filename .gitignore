@@ -148,4 +148,5 @@ vite.config.ts.timestamp-*
 
 output/
 plugins/codex/.generated/
+plugins/claude/.generated/
 .worktrees/
