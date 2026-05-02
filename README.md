@@ -31,10 +31,10 @@ claude auth login
 Add this repository as a Codex plugin marketplace:
 
 ```bash
-codex plugin marketplace add <repo-or-local-path>
+codex plugin marketplace add https://github.com/moabualruz/claude-plugin-codex
 ```
 
-Install or enable the `claude` plugin from that marketplace in Codex, then start a new Codex session so the skills load.
+For local development, pass the repository path instead. Install or enable the `claude` plugin from that marketplace in Codex, then start a new Codex session so the skills load.
 
 Run:
 
@@ -120,6 +120,8 @@ claude-setup --disable-review-gate
 
 ## Runtime
 
-The plugin launches your local `claude` binary with `claude -p --output-format stream-json`. Reviews run with edit tools disabled. Delegated tasks run read-only by default; pass `--write` when Claude should be allowed to edit files.
+The plugin launches your local `claude` binary with `claude -p --output-format stream-json` and sends the prompt over stdin. Reviews run with edit tools disabled. Delegated tasks run read-only by default; pass `--write` when Claude should be allowed to edit files.
+
+Adversarial reviews ask Claude for structured JSON. The runtime accepts raw JSON, fenced JSON, and bare JSON after preamble text, then prefers the latest object-shaped response so corrected Claude output is handled cleanly.
 
 Job state is stored per repository so background output can be retrieved in later Codex turns.
