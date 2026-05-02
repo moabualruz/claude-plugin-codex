@@ -123,7 +123,6 @@ function buildClaudeArgs(options = {}) {
   if (options.disallowedTools?.length) {
     args.push("--disallowedTools", options.disallowedTools.join(","));
   }
-  args.push(options.prompt);
   return args;
 }
 
@@ -228,21 +227,30 @@ export async function runClaudePrompt(cwd, options = {}) {
   }
 
   const outputFormat = options.outputFormat ?? "stream-json";
+  const { prompt: _prompt, defaultPrompt: _defaultPrompt, ...argOptions } = options;
   const args = buildClaudeArgs({
-    ...options,
-    outputFormat,
-    prompt
+    ...argOptions,
+    outputFormat
   });
 
   return new Promise((resolve) => {
     const child = spawn("claude", args, {
       cwd,
       env: options.env ?? process.env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true
     });
     let stdout = "";
     let stderr = "";
+    let stdinError = null;
+    child.stdin.on("error", (error) => {
+      stdinError = error;
+    });
+    try {
+      child.stdin.end(prompt);
+    } catch (error) {
+      stdinError = error;
+    }
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -266,7 +274,17 @@ export async function runClaudePrompt(cwd, options = {}) {
         error
       });
     });
-    child.on("close", (status) => {
+    child.on("close", (status, signal) => {
+      const childStatus = status ?? (signal ? 1 : 0);
+      const normalizedStatus = childStatus !== 0 ? childStatus : (stdinError ? 1 : 0);
+      const shouldReportStdinError = childStatus === 0 && stdinError;
+      const normalizedStderr = [
+        stderr,
+        signal ? `Claude process exited after signal ${signal}.` : "",
+        shouldReportStdinError ? `Failed to write prompt to Claude stdin: ${stdinError.message}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
       const parsed =
         outputFormat === "stream-json"
           ? parseClaudeStream(stdout)
@@ -278,12 +296,12 @@ export async function runClaudePrompt(cwd, options = {}) {
               messages: stdout.trim() ? [stdout.trim()] : []
             };
       resolve({
-        status: status ?? 0,
+        status: normalizedStatus,
         threadId: parsed.threadId,
         turnId: null,
-        finalMessage: status === 0 ? parsed.finalMessage : "",
+        finalMessage: normalizedStatus === 0 ? parsed.finalMessage : "",
         reasoningSummary: parsed.reasoningSummary,
-        stderr,
+        stderr: normalizedStderr,
         stdout,
         touchedFiles: parsed.touchedFiles,
         commandExecutions: [],
@@ -291,7 +309,10 @@ export async function runClaudePrompt(cwd, options = {}) {
           type: "fileChange",
           changes: [{ path: filePath }]
         })),
-        error: status === 0 ? null : new Error(stderr.trim() || `Claude exited with status ${status}`)
+        error:
+          normalizedStatus === 0
+            ? null
+            : new Error(normalizedStderr.trim() || `Claude exited with status ${normalizedStatus}`)
       });
     });
   });
@@ -319,27 +340,135 @@ export function buildPersistentTaskThreadName(prompt) {
 export function parseStructuredOutput(rawOutput, fallback = {}) {
   if (!rawOutput) {
     return {
+      ...fallback,
       parsed: null,
       parseError: fallback.failureMessage ?? "Claude did not return a final structured message.",
-      rawOutput: rawOutput ?? "",
-      ...fallback
+      rawOutput: rawOutput ?? ""
     };
   }
 
-  try {
+  const candidates = buildStructuredOutputCandidates(rawOutput);
+  let parseError = null;
+  const parsedCandidates = [];
+  for (const candidate of candidates) {
+    try {
+      parsedCandidates.push(JSON.parse(candidate));
+    } catch (error) {
+      parseError ??= error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  const objectCandidates = parsedCandidates.filter((parsed) => isPlainObject(parsed));
+  const preferred = lastValue(objectCandidates) ?? lastValue(parsedCandidates);
+  if (preferred) {
     return {
-      parsed: JSON.parse(rawOutput),
+      ...fallback,
+      parsed: preferred,
       parseError: null,
-      rawOutput,
-      ...fallback
+      rawOutput
     };
-  } catch (error) {
-    return {
-      parsed: null,
-      parseError: error instanceof Error ? error.message : String(error),
-      rawOutput,
-      ...fallback
-    };
+  }
+
+  return {
+    ...fallback,
+    parsed: null,
+    parseError,
+    rawOutput
+  };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function lastValue(values) {
+  return values.length > 0 ? values[values.length - 1] : null;
+}
+
+function buildStructuredOutputCandidates(rawOutput) {
+  const trimmed = String(rawOutput ?? "").trim();
+  const candidates = [];
+  addCandidate(candidates, trimmed);
+
+  addBareJsonCandidates(candidates, trimmed);
+  addFencedCandidates(candidates, trimmed);
+
+  return candidates;
+}
+
+function addBareJsonCandidates(candidates, text) {
+  const lineStartPattern = /(?:^|\r?\n)\s*[\[{]/g;
+  let match;
+  while ((match = lineStartPattern.exec(text)) !== null) {
+    const jsonStart = match.index + (match[0].startsWith("\n") || match[0].startsWith("\r\n") ? match[0].search(/[\[{]/) : 0);
+    const candidate = text.slice(jsonStart).trim();
+    const extracted = extractJsonPrefix(candidate);
+    if (extracted) {
+      addCandidate(candidates, extracted);
+    }
+  }
+}
+
+function extractJsonPrefix(value) {
+  const text = String(value ?? "").trim();
+  const first = text[0];
+  if (first !== "{" && first !== "[") {
+    return null;
+  }
+
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{" || char === "[") {
+      stack.push(char);
+    } else if (char === "}" || char === "]") {
+      const opener = stack.pop();
+      if ((char === "}" && opener !== "{") || (char === "]" && opener !== "[")) {
+        return null;
+      }
+      if (stack.length === 0) {
+        return text.slice(0, index + 1).trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+function addFencedCandidates(candidates, text) {
+  const openerPattern = /```[^\r\n]*(?:\r?\n)/g;
+  let opener;
+  while ((opener = openerPattern.exec(text)) !== null) {
+    const contentStart = opener.index + opener[0].length;
+    const tail = text.slice(contentStart);
+    const closer = /\r?\n```\s*(?:\r?\n|$)/.exec(tail);
+    if (!closer) {
+      openerPattern.lastIndex = contentStart;
+      continue;
+    }
+    addCandidate(candidates, tail.slice(0, closer.index).trim());
+    openerPattern.lastIndex = contentStart + closer.index + closer[0].length;
+  }
+}
+
+function addCandidate(candidates, value) {
+  if (value && !candidates.includes(value)) {
+    candidates.push(value);
   }
 }
 

@@ -14,18 +14,19 @@ export function buildEnv(binDir, extra = {}) {
 export function installFakeClaude(binDir, behavior = "review-ok") {
   const scriptPath = path.join(binDir, "claude");
   const source = `#!/usr/bin/env node
+const fs = require("node:fs");
 const BEHAVIOR = ${JSON.stringify(behavior)};
 
 function writeJson(value) {
   process.stdout.write(JSON.stringify(value) + "\\n");
 }
 
-function promptFromArgs(args) {
-  const printIndex = args.indexOf("-p");
-  if (printIndex >= 0 && args[printIndex + 1] && !args[printIndex + 1].startsWith("-")) {
-    return args[printIndex + 1];
+function promptFromStdin() {
+  try {
+    return fs.readFileSync(0, "utf8").trim();
+  } catch {
+    return "";
   }
-  return args[args.length - 1] || "";
 }
 
 const args = process.argv.slice(2);
@@ -60,7 +61,11 @@ if (BEHAVIOR === "auth-run-fails") {
 }
 
 function runPrompt() {
-  const prompt = promptFromArgs(args);
+  const prompt = promptFromStdin();
+  if (!prompt) {
+    console.error("stdin prompt required");
+    process.exit(1);
+  }
   const outputFormatIndex = args.indexOf("--output-format");
   const outputFormat = outputFormatIndex >= 0 ? args[outputFormatIndex + 1] : "text";
   const wantsStructured = /json|structured|schema|adversarial/i.test(prompt);
@@ -81,7 +86,12 @@ function runPrompt() {
   process.exit(0);
 }
 
-if (BEHAVIOR === "slow") {
+if (BEHAVIOR === "signal-terminates") {
+  process.kill(process.pid, "SIGTERM");
+  setTimeout(() => {
+    process.exit(0);
+  }, 5000);
+} else if (BEHAVIOR === "slow") {
   setTimeout(runPrompt, 5000);
 } else {
   runPrompt();
