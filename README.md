@@ -36,6 +36,8 @@ codex plugin marketplace add https://github.com/moabualruz/claude-plugin-codex
 
 For local development, pass the repository path instead. Install or enable the `claude` plugin from that marketplace in Codex, then start a new Codex session so the skills load.
 
+The npm package is `codex-plugin-claude-code`. Codex marketplace installation currently uses the GitHub repository or a local marketplace path, so the npm package is published for package distribution and metadata, not as the primary Codex install transport.
+
 Run:
 
 ```text

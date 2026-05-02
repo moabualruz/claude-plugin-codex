@@ -18,7 +18,7 @@ const FORBIDDEN = [
 
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if ([".git", "node_modules", ".generated"].includes(entry.name)) {
+    if ([".git", ".worktrees", "node_modules", ".generated"].includes(entry.name)) {
       continue;
     }
     const fullPath = path.join(dir, entry.name);

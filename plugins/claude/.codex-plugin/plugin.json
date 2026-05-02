@@ -1,9 +1,9 @@
 {
   "name": "claude",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Use Claude Code from Codex to review code or delegate tasks.",
   "author": {
-    "name": "OpenAI"
+    "name": "moabualruz"
   },
   "license": "Apache-2.0",
   "skills": "./skills/",
@@ -12,7 +12,7 @@
     "displayName": "Claude Code",
     "shortDescription": "Run Claude Code from Codex.",
     "longDescription": "Review code, delegate tasks, and manage background Claude Code runs from Codex.",
-    "developerName": "OpenAI",
+    "developerName": "moabualruz",
     "category": "Productivity",
     "capabilities": [
       "Interactive",
