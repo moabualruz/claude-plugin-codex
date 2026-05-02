@@ -1,6 +1,6 @@
 {
   "name": "claude",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Use Claude Code from Codex to review code or delegate tasks.",
   "author": {
     "name": "OpenAI"
@@ -14,7 +14,10 @@
     "longDescription": "Review code, delegate tasks, and manage background Claude Code runs from Codex.",
     "developerName": "OpenAI",
     "category": "Productivity",
-    "capabilities": ["Interactive", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
     "defaultPrompt": [
       "Ask Claude to review my changes.",
       "Ask Claude to investigate this bug.",
