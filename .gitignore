@@ -150,3 +150,5 @@ output/
 plugins/codex/.generated/
 plugins/claude/.generated/
 .worktrees/
+
+.codegraph/
