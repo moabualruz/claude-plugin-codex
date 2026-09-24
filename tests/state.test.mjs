@@ -9,7 +9,16 @@ import { resolveJobFile, resolveJobLogFile, resolveStateDir, resolveStateFile, s
 
 test("resolveStateDir uses a temp-backed per-workspace directory", () => {
   const workspace = makeTempDir();
-  const stateDir = resolveStateDir(workspace);
+  const saved = [process.env.CODEX_PLUGIN_DATA, process.env.CLAUDE_PLUGIN_DATA];
+  delete process.env.CODEX_PLUGIN_DATA;
+  delete process.env.CLAUDE_PLUGIN_DATA;
+  let stateDir;
+  try {
+    stateDir = resolveStateDir(workspace);
+  } finally {
+    if (saved[0] !== undefined) process.env.CODEX_PLUGIN_DATA = saved[0];
+    if (saved[1] !== undefined) process.env.CLAUDE_PLUGIN_DATA = saved[1];
+  }
 
   assert.equal(stateDir.startsWith(os.tmpdir()), true);
   assert.match(path.basename(stateDir), /.+-[a-f0-9]{16}$/);
